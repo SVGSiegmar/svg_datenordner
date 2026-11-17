@@ -1,0 +1,15 @@
+name: svg_datenordner
+description: >-
+  Gemeinsamer Datenordner für die Apps des Stadtverbands der Gartenfreunde
+  Halle/Saale (Kleingartenverwaltung, Gartenvergabe, Gartenbegehung, Kassenbuch).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.0.0
+
+dependencies:
+  crypto: ^3.0.3
+
+dev_dependencies:
+  test: ^1.25.0

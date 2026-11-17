@@ -1,0 +1,148 @@
+# svg_datenordner
+
+Gemeinsamer Datenordner für Kleingartenverwaltung, Gartenvergabe, Gartenbegehung
+und später das Kassenbuch. Version 0.1.0 – Stand 17.11.2026.
+
+Das Paket ist reines Dart (kein Flutter nötig) und hat nur eine Abhängigkeit: `crypto`.
+
+## Was es kann
+
+| Baustein | Aufgabe |
+| --- | --- |
+| `DatenordnerEinstellung` | Speicherart pro Gerät: `lokal`, `ordner` (NAS, FRITZ!Box, OneDrive, iCloud …), `svgCloud` (später). Wird bei der Einrichtung abgefragt und lokal gespeichert, nie in der gemeinsamen Datei. |
+| `Datenordner` | Alle Pfade im Ordner: `daten/app_daten.json`, `locks/`, `begehung/<Jahr>/<Garten>/`, `vergabe/<Garten>/`, `rechnungen/` … |
+| `Schreibsperre` | Kurze Sperre nur während des Speicherns (`locks/schreibsperre.json`). Verwaist nach 2 Minuten. |
+| `GemeinsameDaten` | Lesen, Prüfsumme (SHA-256 wie in der Kleingartenverwaltung) und **sicheres Ändern**: Sperre → frisch lesen → ändern → schreiben → Sperre frei. |
+| `KgvDaten` | Bequemer Zugriff auf Verein, Parzellen und Mitglieder im Format der Kleingartenverwaltung; neues Mitglied anlegen; Vorpächter austragen; Datum TT.MM.JJJJ. |
+
+Bei „lokal“ übergibt die App ihren Dokumentenordner als Wurzel. Dann gilt derselbe
+Aufbau auf dem Gerät, und der Code ist für beide Fälle gleich.
+
+## Die eine Regel für alle Apps
+
+**Neu lesen – Änderung einfügen – schreiben.** Eine App schreibt nie ihren ganzen
+Datenstand zurück, sondern holt sich unter der Sperre den aktuellen Stand und ändert
+nur das, was sie ändern will. Alles andere (auch Bereiche, die sie gar nicht kennt,
+wie Rechnungen oder Benutzer) bleibt unverändert.
+
+## Schritt 1: Tests auf dem Mac ausführen
+
+```bash
+cd ~/X-Code-Projekte/Pakete/svg_datenordner
+dart pub get
+dart test
+```
+
+Alle Tests müssen grün sein. Sie prüfen u. a., dass zwei Apps gleichzeitig
+speichern und trotzdem keine Änderung verloren geht.
+
+## Schritt 2: Als eigenes GitHub-Repository anlegen
+
+Weil die Apps über GitHub gebaut werden, funktioniert ein lokaler Pfad
+(`path: ../..`) dort nicht. Deshalb das Paket als eigenes Repository anlegen,
+z. B. `svg_datenordner`, und mit einer Versionsmarke versehen:
+
+```bash
+cd ~/X-Code-Projekte/Pakete/svg_datenordner
+git init && git add . && git commit -m "svg_datenordner 0.1.0"
+git tag v0.1.0
+# Repository auf GitHub anlegen, dann:
+git remote add origin https://github.com/<Konto>/svg_datenordner.git
+git push -u origin main --tags
+```
+
+Ist das Repository privat, braucht der GitHub-Build der Apps Lesezugriff darauf
+(z. B. über einen Deploy-Key oder ein Token in den Actions-Secrets).
+
+## Schritt 3: In einer App einbinden
+
+In der `pubspec.yaml` der App:
+
+```yaml
+dependencies:
+  svg_datenordner:
+    git:
+      url: https://github.com/<Konto>/svg_datenordner.git
+      ref: v0.1.0
+```
+
+Danach `flutter pub get`.
+
+## Beispiel Gartenvergabe: Daten übernehmen
+
+```dart
+import 'package:svg_datenordner/svg_datenordner.dart';
+
+final ordner = Datenordner(einstellung.pfad);
+final gd = GemeinsameDaten(ordner, app: 'Gartenvergabe', benutzer: benutzername);
+
+final stand = await gd.lesen();          // null = noch keine Daten im Ordner
+if (stand != null) {
+  final kgv = KgvDaten(stand.daten);
+  settings.clubName = kgv.vereinsname;
+  settings.clubAddress = kgv.vereinsanschrift;
+  settings.place = kgv.vereinsort;
+  settings.chairperson = kgv.vorsitz;
+
+  final freieGaerten = kgv.parzellennummern(nurLeerstand: true);
+  final p = kgv.parzelle(gewaehlteNummer);
+  assignment.gardenArea = (p?['pachtflaeche'] ?? '').toString();
+  assignment.waterMeterNumber = (p?['wasserZaehler'] ?? '').toString();
+  assignment.electricityMeterNumber = (p?['stromZaehler'] ?? '').toString();
+
+  final vorpaechter = kgv.paechterVon(gewaehlteNummer);   // für Verkäufer der Laube
+}
+```
+
+## Beispiel Gartenvergabe: neuen Pächter übergeben
+
+```dart
+await gd.aendern((daten) {
+  final kgv = KgvDaten(daten);
+  final neu = kgv.neuesMitglied({
+    'vorname': a.firstName,
+    'name': a.lastName,
+    'adresse': a.street,
+    'plz': a.postalCode,
+    'ort': a.city,
+    'telefon': a.phone,
+    'email': a.email,
+    'geburtstag': a.birthDate == null ? '' : KgvDaten.datumKgv(a.birthDate!),
+    'garten': a.gardenNumber,
+    'eintrittsdatum': KgvDaten.datumKgv(a.takeoverDate!),
+  });
+  kgv.bisherigePaechterAustragen(
+    a.gardenNumber,
+    a.takeoverDate!,
+    ausser: {neu['id'] as int},
+  );
+});
+```
+
+Kann die Sperre nicht geholt werden, kommt `SchreibsperreBelegt`. Deren
+`beschreibung` (z. B. „Kleingartenverwaltung (Siegmar an MacBook) speichert gerade.“)
+kann direkt angezeigt werden.
+
+## Was die Kleingartenverwaltung noch braucht
+
+Die Kleingartenverwaltung erkennt fremde Änderungen schon heute über die Prüfsumme
+und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
+
+1. **Speichern unter der Schreibsperre.** In `speichereAlleDatenJetzt` die Prüfung
+   der Prüfsumme und das Schreiben zwischen `Schreibsperre.erwerben()` und
+   `freigeben()` legen. Sonst kann die Gartenvergabe genau zwischen Prüfen und
+   Schreiben speichern.
+2. **„Meine Fassung speichern“ entschärfen.** Dieser Knopf im Konfliktdialog schreibt
+   den ganzen eigenen Stand und löscht damit z. B. einen Pächter, den die
+   Gartenvergabe gerade angelegt hat. Besser: nur „Neu laden“ anbieten, oder die
+   eigene Änderung nach dem Neuladen erneut anwenden.
+
+## Grenzen
+
+- **NAS / FRITZ!Box:** Sperre und Prüfsumme greifen sofort, mehrere Personen sind möglich.
+- **OneDrive, iCloud, MagentaCloud:** Diese Ordner gleichen sich mit Verzögerung ab.
+  Die Sperre kommt beim anderen Rechner evtl. zu spät an, es können Konfliktkopien
+  entstehen. Empfehlung: dort jeweils nur eine Person zur Zeit.
+- **iPad / Android:** kein frei einstellbarer Pfad. Ein Ordner muss einmal über die
+  Dateien-App bzw. die Android-Ordnerauswahl freigegeben werden; SMB-Freigaben sind
+  dort unzuverlässig.
