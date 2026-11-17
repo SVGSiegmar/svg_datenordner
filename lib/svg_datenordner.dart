@@ -6,7 +6,7 @@
 /// <Datenordner>/
 ///   daten/app_daten.json       Verein, Parzellen, Mitglieder
 ///   locks/                     aktive_sitzungen.json, schreibsperre.json
-///   dokumente/<Kategorie>/Parzelle <Nr>/<Datum>/
+///   dokumente/<Kategorie>/Parzelle <Nr>/ (ohne Datumsordner)
 ///                              z. B. Begehung (Gartenbegehung),
 ///                              Pachtvertrag (Gartenvergabe)
 ///   rechnungen/, backups/, protokoll/

@@ -73,7 +73,11 @@ class Datenordner {
   Directory get rechnungenOrdner => Directory(pfad(['rechnungen']));
 
   /// Dokumentenordner einer Parzelle – genau wie in der Kleingartenverwaltung:
-  /// dokumente/<Kategorie>/Parzelle <Nr>/[JJJJ-MM-TT]/
+  /// dokumente/<Kategorie>/Parzelle <Nr>/
+  ///
+  /// Bitte ohne [datum] verwenden: Die Kleingartenverwaltung zeigt nur Dateien,
+  /// die direkt in „Parzelle <Nr>“ liegen. Das Datum gehört in den Dateinamen.
+  /// [datum] bleibt nur aus Kompatibilitätsgründen erhalten.
   ///
   /// Die Kleingartenverwaltung zeigt jede Kategorie, in der es einen Ordner
   /// „Parzelle <Nr>“ gibt, automatisch unter den Dokumenten dieser Parzelle an.

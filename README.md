@@ -10,7 +10,7 @@ Das Paket ist reines Dart (kein Flutter nötig) und hat nur eine Abhängigkeit: 
 | Baustein | Aufgabe |
 | --- | --- |
 | `DatenordnerEinstellung` | Speicherart pro Gerät: `lokal`, `ordner` (NAS, FRITZ!Box, OneDrive, iCloud …), `svgCloud` (später). Wird bei der Einrichtung abgefragt und lokal gespeichert, nie in der gemeinsamen Datei. |
-| `Datenordner` | Alle Pfade im Ordner: `daten/app_daten.json`, `locks/`, `begehung/<Jahr>/<Garten>/`, `vergabe/<Garten>/`, `rechnungen/` … |
+| `Datenordner` | Alle Pfade im Ordner: `daten/app_daten.json`, `locks/`, `rechnungen/` und die Dokumentenordner der Parzellen `dokumente/<Kategorie>/Parzelle <Nr>/` – exakt wie in der Kleingartenverwaltung. `freieDatei` liefert einen Dateinamen, der nichts überschreibt. |
 | `Schreibsperre` | Kurze Sperre nur während des Speicherns (`locks/schreibsperre.json`). Verwaist nach 2 Minuten. |
 | `GemeinsameDaten` | Lesen, Prüfsumme (SHA-256 wie in der Kleingartenverwaltung) und **sicheres Ändern**: Sperre → frisch lesen → ändern → schreiben → Sperre frei. |
 | `KgvDaten` | Bequemer Zugriff auf Verein, Parzellen und Mitglieder im Format der Kleingartenverwaltung; neues Mitglied anlegen; Vorpächter austragen; Datum TT.MM.JJJJ. |
@@ -122,6 +122,32 @@ await gd.aendern((daten) {
 Kann die Sperre nicht geholt werden, kommt `SchreibsperreBelegt`. Deren
 `beschreibung` (z. B. „Kleingartenverwaltung (Siegmar an MacBook) speichert gerade.“)
 kann direkt angezeigt werden.
+
+## Beispiel Gartenbegehung: PDF bei der Parzelle ablegen
+
+PDFs und Fotos der Begehung entstehen nur in der Gartenbegehung. Jede Datei
+bekommt einen eigenen Namen, nichts wird überschrieben – deshalb ist dafür
+**keine Schreibsperre nötig**. Die Kleingartenverwaltung zeigt die Kategorie
+„Begehung“ automatisch bei den Dokumenten der Parzelle an.
+
+```dart
+final kgv = KgvDaten((await gd.lesen())!.daten);
+// Schreibweise aus app_daten.json übernehmen, damit der Ordner exakt passt
+final parzelle = (kgv.parzelle(gartennummer)?['parzelle'] ?? gartennummer).toString();
+
+final zielOrdner = ordner.dokumentOrdner('Begehung', parzelle);
+final datum = begehungsDatum.toIso8601String().substring(0, 10); // 2026-11-17
+final ziel = await Datenordner.freieDatei(zielOrdner, 'Begehung_${parzelle}_$datum.pdf');
+await ziel.writeAsBytes(pdfBytes, flush: true);
+```
+
+Ergebnis z. B.: `dokumente/Begehung/Parzelle 12A/Begehung_12A_2026-11-17.pdf`
+
+**Keine Datumsordner:** Die Kleingartenverwaltung zeigt beim Pächter nur Dateien,
+die direkt im Ordner `Parzelle <Nr>` liegen. Das Datum gehört in den Dateinamen.
+
+Dasselbe gilt für die Gartenvergabe mit der Kategorie „Pachtvertrag“. Auch extern
+erstellte Pachtverträge landen so an derselben Stelle.
 
 ## Was die Kleingartenverwaltung noch braucht
 
