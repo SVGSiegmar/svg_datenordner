@@ -185,6 +185,51 @@ void main() {
     });
   });
 
+  group('Kassenbuch-Datei (0.2.0)', () {
+    test('schreibt daten/kassenbuch.json, app_daten.json bleibt unberührt',
+        () async {
+      await ordner.datenDatei.writeAsString(jsonEncode(beispielDaten()));
+      final vorher = await ordner.datenDatei.readAsString();
+      final kb = GemeinsameDaten(ordner,
+          app: 'Kassenbuch', datei: ordner.kassenbuchDatei);
+
+      await kb.aendern((d) => d['buchungen'] = [1, 2],
+          neuAnlegenErlaubt: true);
+
+      expect(ordner.kassenbuchDatei.path, endsWith('kassenbuch.json'));
+      expect((await kb.lesen())!.daten['buchungen'], [1, 2]);
+      expect(await ordner.datenDatei.readAsString(), vorher);
+      expect(await ordner.schreibsperreDatei.exists(), isFalse);
+    });
+
+    test('erwartetePruefsumme: schreibt nur auf bekanntem Stand', () async {
+      final a = GemeinsameDaten(ordner,
+          app: 'Kassenbuch', datei: ordner.kassenbuchDatei);
+      final b = GemeinsameDaten(ordner,
+          app: 'Kassenbuch', datei: ordner.kassenbuchDatei);
+
+      // Datei fehlt noch: erwartet '' -> erlaubt
+      final stand1 = await a.aendern((d) => d['wert'] = 1,
+          neuAnlegenErlaubt: true, erwartetePruefsumme: '');
+      // b speichert dazwischen
+      await b.aendern((d) => d['wert'] = 2);
+
+      // a hat einen veralteten Stand -> nichts schreiben
+      await expectLater(
+        a.aendern((d) => d['wert'] = 3,
+            erwartetePruefsumme: stand1.pruefsumme),
+        throwsA(isA<DatenWurdenGeaendert>()),
+      );
+      expect((await a.lesen())!.daten['wert'], 2);
+      expect(await ordner.schreibsperreDatei.exists(), isFalse);
+
+      // mit aktuellem Stand klappt es
+      final aktuell = (await a.lesen())!.pruefsumme;
+      await a.aendern((d) => d['wert'] = 4, erwartetePruefsumme: aktuell);
+      expect((await a.lesen())!.daten['wert'], 4);
+    });
+  });
+
   group('KgvDaten', () {
     test('Vereinsdaten', () {
       final k = KgvDaten(beispielDaten());

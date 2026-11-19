@@ -5,6 +5,7 @@
 /// ```
 /// <Datenordner>/
 ///   daten/app_daten.json       Verein, Parzellen, Mitglieder
+///   daten/kassenbuch.json      Kassenbuch (ab 0.2.0)
 ///   locks/                     aktive_sitzungen.json, schreibsperre.json
 ///   dokumente/<Kategorie>/Parzelle <Nr>/ (ohne Datumsordner)
 ///                              z. B. Begehung (Gartenbegehung),

@@ -67,6 +67,16 @@ class Datenordner {
   }
 
   File get datenDatei => File(pfad(['daten', datenDateiName]));
+
+  /// Eigene Datendatei des Kassenbuchs (ab 0.2.0). Liegt neben
+  /// app_daten.json, damit Buchungen und Änderungsprotokoll die gemeinsame
+  /// Datei der anderen Apps nicht aufblähen.
+  static const String kassenbuchDateiName = 'kassenbuch.json';
+
+  File get kassenbuchDatei => File(pfad(['daten', kassenbuchDateiName]));
+
+  /// Beliebige Datei im Ordner daten/ (z. B. für weitere Apps).
+  File datenDateiMitNamen(String name) => File(pfad(['daten', name]));
   File get schreibsperreDatei => File(pfad(['locks', 'schreibsperre.json']));
   File get sitzungsDatei => File(pfad(['locks', 'aktive_sitzungen.json']));
 

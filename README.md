@@ -1,7 +1,7 @@
 # svg_datenordner
 
 Gemeinsamer Datenordner für Kleingartenverwaltung, Gartenvergabe, Gartenbegehung
-und später das Kassenbuch. Version 0.1.0 – Stand 17.11.2026.
+und Kassenbuch. Version 0.2.0 – Stand 19.11.2026.
 
 Das Paket ist reines Dart (kein Flutter nötig) und hat nur eine Abhängigkeit: `crypto`.
 
@@ -17,6 +17,24 @@ Das Paket ist reines Dart (kein Flutter nötig) und hat nur eine Abhängigkeit: 
 
 Bei „lokal“ übergibt die App ihren Dokumentenordner als Wurzel. Dann gilt derselbe
 Aufbau auf dem Gerät, und der Code ist für beide Fälle gleich.
+
+## Neu in 0.2.0: eigene Datei für das Kassenbuch
+
+Das Kassenbuch speichert in `daten/kassenbuch.json` (neben `app_daten.json`),
+mit derselben Schreibsperre. So wachsen Buchungen und Änderungsprotokoll nicht in
+die gemeinsame Datei der anderen Apps hinein; lesen können diese sie trotzdem.
+
+```dart
+final kb = GemeinsameDaten(ordner,
+    app: 'Kassenbuch', benutzer: benutzer, datei: ordner.kassenbuchDatei);
+final stand = await kb.lesen();
+await kb.aendern((d) { /* … */ },
+    neuAnlegenErlaubt: true, erwartetePruefsumme: stand?.pruefsumme ?? '');
+```
+
+Mit `erwartetePruefsumme` schreibt `aendern` nur, wenn die Datei seit dem letzten
+Lesen unverändert ist – sonst kommt `DatenWurdenGeaendert` und nichts wird
+überschrieben. Ohne den Parameter verhält sich alles wie in 0.1.0.
 
 ## Die eine Regel für alle Apps
 
