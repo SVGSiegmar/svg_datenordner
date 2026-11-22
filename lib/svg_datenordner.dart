@@ -17,4 +17,5 @@ library svg_datenordner;
 export 'src/datenordner.dart';
 export 'src/gemeinsame_daten.dart';
 export 'src/kgv_daten.dart';
+export 'src/ordner_umzug.dart';
 export 'src/schreibsperre.dart';

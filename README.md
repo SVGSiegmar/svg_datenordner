@@ -201,3 +201,16 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
   Kassenbuch).
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
+
+## 0.4.0 (22.11.2026)
+
+- `OrdnerUmzug(alt, neu)`: nimmt beim Wechsel des Datenordners den Inhalt des
+  bisherigen Ordners mit – ohne Terminal oder Finder.
+  - `pruefen()` liefert einen `UmzugBestand` (Datendateien, Rechnungen, Dokumente,
+    weitere Dateien, `schonImZiel`, `beschreibung` für die Rückfrage).
+  - `ausfuehren(fortschritt: …)` kopiert wie `rsync --ignore-existing`: Ordner
+    zusammenführen, vorhandene Dateien nie überschreiben, `locks/`, `temp/`,
+    Papierkorb, `*.lock` und Hilfsdateien auslassen; der alte Ordner bleibt.
+- Empfohlener Ablauf in jeder App beim „Ordner auswählen“: `pruefen()`, bei
+  `!leer` fragen („Im bisherigen Ordner liegen … – in den neuen Ordner
+  mitnehmen?“), dann `ausfuehren()` und das Ergebnis anzeigen.

@@ -291,4 +291,80 @@ void main() {
       expect(KgvDaten.datumAusKgv(''), isNull);
     });
   });
+
+  group('OrdnerUmzug', () {
+    late Directory neuTmp;
+    late Datenordner neu;
+
+    setUp(() async {
+      neuTmp = await Directory.systemTemp.createTemp('svg_umzug_ziel');
+      neu = Datenordner(neuTmp.path);
+    });
+
+    tearDown(() async {
+      if (await neuTmp.exists()) await neuTmp.delete(recursive: true);
+    });
+
+    Future<void> schreibe(Datenordner o, String rel, String text) async {
+      final f = File(o.pfad(rel.split('/')));
+      await f.parent.create(recursive: true);
+      await f.writeAsString(text);
+    }
+
+    test('zählt den Bestand und nimmt alles mit, Sperren nicht', () async {
+      await schreibe(ordner, 'daten/app_daten.json', '{"a":1}');
+      await schreibe(ordner, 'daten/gartenvergabe.json', '{}');
+      await schreibe(ordner, 'rechnungen/Parzelle 1/R1.pdf', 'pdf');
+      await schreibe(ordner, 'dokumente/Begehung/Parzelle 1/B.pdf', 'pdf');
+      await schreibe(ordner, 'logos/logo.png', 'png');
+      await schreibe(ordner, 'locks/schreibsperre.json', '{}');
+      await schreibe(ordner, 'kgv_kassenbuch.lock', '{}');
+      await schreibe(ordner, '.DS_Store', 'x');
+
+      final umzug = OrdnerUmzug(ordner, neu);
+      final bestand = await umzug.pruefen();
+      expect(bestand.datendateien, 2);
+      expect(bestand.rechnungen, 1);
+      expect(bestand.dokumente, 1);
+      expect(bestand.sonstige, 1);
+      expect(bestand.schonImZiel, isEmpty);
+      expect(bestand.beschreibung,
+          '2 Datendateien, 1 Rechnung, 1 Dokument und 1 weitere Datei');
+
+      final ergebnis = await umzug.ausfuehren();
+      expect(ergebnis.fehlerfrei, isTrue);
+      expect(ergebnis.kopiert.length, 5);
+      expect(await File(neu.pfad(['rechnungen', 'Parzelle 1', 'R1.pdf'])).readAsString(), 'pdf');
+      expect(await File(neu.pfad(['locks', 'schreibsperre.json'])).exists(), isFalse);
+      expect(await File(neu.pfad(['kgv_kassenbuch.lock'])).exists(), isFalse);
+      expect(await neu.austauschOrdner.exists(), isTrue);
+      // Quelle bleibt unverändert
+      expect(await File(ordner.pfad(['daten', 'app_daten.json'])).exists(), isTrue);
+    });
+
+    test('überschreibt im Ziel nie eine vorhandene Datei', () async {
+      await schreibe(ordner, 'daten/app_daten.json', 'alt');
+      await schreibe(ordner, 'daten/neu.json', 'neu');
+      await schreibe(neu, 'daten/app_daten.json', 'schon da');
+      await schreibe(neu, 'daten/kassenbuch.json', 'kasse');
+
+      final umzug = OrdnerUmzug(ordner, neu);
+      final bestand = await umzug.pruefen();
+      expect(bestand.schonImZiel, ['daten/app_daten.json']);
+
+      final ergebnis = await umzug.ausfuehren();
+      expect(ergebnis.uebersprungen, ['daten/app_daten.json']);
+      expect(ergebnis.kopiert, ['daten/neu.json']);
+      expect(await File(neu.pfad(['daten', 'app_daten.json'])).readAsString(), 'schon da');
+      expect(await File(neu.pfad(['daten', 'kassenbuch.json'])).readAsString(), 'kasse');
+    });
+
+    test('lehnt gleichen oder verschachtelten Ordner ab', () async {
+      expect(() => OrdnerUmzug(ordner, Datenordner(ordner.wurzel)).pruefen(),
+          throwsArgumentError);
+      expect(
+          () => OrdnerUmzug(ordner, Datenordner(ordner.pfad(['unter']))).pruefen(),
+          throwsArgumentError);
+    });
+  });
 }
