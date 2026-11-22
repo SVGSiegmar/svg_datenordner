@@ -190,3 +190,14 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - **iPad / Android:** kein frei einstellbarer Pfad. Ein Ordner muss einmal über die
   Dateien-App bzw. die Android-Ordnerauswahl freigegeben werden; SMB-Freigaben sind
   dort unzuverlässig.
+
+## 0.3.0 (22.11.2026)
+
+- Ordner `austausch/` für den Datenaustausch Kleingartenverwaltung ↔ Kassenbuch,
+  wird von `grundordnerAnlegen()` mit angelegt.
+- `austauschOrdner`, `verwaltungForderungenDatei`
+  (`austausch/verwaltung_forderungen.json`, schreibt die Verwaltung),
+  `kassenbuchZahlungenDatei` (`austausch/kassenbuch_zahlungen.json`, schreibt das
+  Kassenbuch).
+- `gartenvergabeDatei` (`daten/gartenvergabe.json`).
+- Abwärtskompatibel zu 0.1.0 und 0.2.0.

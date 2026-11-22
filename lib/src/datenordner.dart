@@ -75,6 +75,26 @@ class Datenordner {
 
   File get kassenbuchDatei => File(pfad(['daten', kassenbuchDateiName]));
 
+  /// Eigene Datendatei der Gartenvergabe (Vergaben, Löschvermerke).
+  static const String gartenvergabeDateiName = 'gartenvergabe.json';
+
+  File get gartenvergabeDatei =>
+      File(pfad(['daten', gartenvergabeDateiName]));
+
+  /// Austausch zwischen Kleingartenverwaltung und Kassenbuch (ab 0.3.0).
+  /// Jede App schreibt nur ihre eigene Datei und liest die der anderen.
+  Directory get austauschOrdner => Directory(pfad(['austausch']));
+
+  /// Schreibt die Kleingartenverwaltung: Debitoren, Rechnungen mit
+  /// Positionen und Kostenart, Stornos, Ratenpläne.
+  File get verwaltungForderungenDatei =>
+      File(pfad(['austausch', 'verwaltung_forderungen.json']));
+
+  /// Schreibt das Kassenbuch: Zahlungen mit Zuordnung zur Rechnung,
+  /// Beträge der Eingangsrechnungen Strom und Wasser.
+  File get kassenbuchZahlungenDatei =>
+      File(pfad(['austausch', 'kassenbuch_zahlungen.json']));
+
   /// Beliebige Datei im Ordner daten/ (z. B. für weitere Apps).
   File datenDateiMitNamen(String name) => File(pfad(['daten', name]));
   File get schreibsperreDatei => File(pfad(['locks', 'schreibsperre.json']));
@@ -143,6 +163,7 @@ class Datenordner {
   Future<void> grundordnerAnlegen() async {
     for (final teil in const [
       'daten',
+      'austausch',
       'locks',
       'dokumente',
       'rechnungen',

@@ -58,6 +58,12 @@ void main() {
     test('legt die Grundordner an und baut Pfade', () async {
       expect(await Directory(ordner.pfad(['daten'])).exists(), isTrue);
       expect(await Directory(ordner.pfad(['locks'])).exists(), isTrue);
+      expect(await ordner.austauschOrdner.exists(), isTrue);
+      expect(ordner.verwaltungForderungenDatei.path,
+          endsWith('verwaltung_forderungen.json'));
+      expect(ordner.kassenbuchZahlungenDatei.path,
+          endsWith('kassenbuch_zahlungen.json'));
+      expect(ordner.gartenvergabeDatei.path, endsWith('gartenvergabe.json'));
       expect(ordner.datenDatei.path, endsWith('app_daten.json'));
       final s = Platform.pathSeparator;
       expect(
