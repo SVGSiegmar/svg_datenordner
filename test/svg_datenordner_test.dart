@@ -367,4 +367,35 @@ void main() {
           throwsArgumentError);
     });
   });
+
+  group('SvgSicherung', () {
+    test('verschlüsseln und mit dem richtigen Passwort öffnen', () async {
+      final inhalt = utf8.encode('{"buchungen":[1,2,3],"text":"Grüße"}');
+      final datei = await SvgSicherung.verschluesseln(inhalt, 'geheim123',
+          app: 'Test', durchlaeufe: 1000);
+      expect(SvgSicherung.istSicherung(datei), isTrue);
+      expect(utf8.decode(datei).contains('Grüße'), isFalse);
+      expect(SvgSicherung.kopf(datei)!['app'], 'Test');
+      final zurueck = await SvgSicherung.entschluesseln(datei, 'geheim123');
+      expect(utf8.decode(zurueck), utf8.decode(inhalt));
+    });
+
+    test('falsches Passwort und veränderte Datei werden erkannt', () async {
+      final datei = await SvgSicherung.verschluesseln(
+          utf8.encode('x' * 500), 'geheim123', durchlaeufe: 1000);
+      await expectLater(SvgSicherung.entschluesseln(datei, 'falsch123'),
+          throwsA(isA<SicherungPasswortFalsch>()));
+      final m = jsonDecode(utf8.decode(datei)) as Map<String, dynamic>;
+      final d = base64Decode(m['daten'] as String);
+      d[0] ^= 1;
+      m['daten'] = base64Encode(d);
+      await expectLater(
+          SvgSicherung.entschluesseln(utf8.encode(jsonEncode(m)), 'geheim123'),
+          throwsA(isA<SicherungPasswortFalsch>()));
+    });
+
+    test('zu kurzes Passwort wird abgelehnt', () {
+      expect(() => SvgSicherung.verschluesseln([1], 'kurz'), throwsArgumentError);
+    });
+  });
 }

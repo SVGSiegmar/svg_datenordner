@@ -19,3 +19,4 @@ export 'src/gemeinsame_daten.dart';
 export 'src/kgv_daten.dart';
 export 'src/ordner_umzug.dart';
 export 'src/schreibsperre.dart';
+export 'src/sicherung.dart';

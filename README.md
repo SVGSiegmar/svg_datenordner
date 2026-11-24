@@ -36,6 +36,28 @@ Mit `erwartetePruefsumme` schreibt `aendern` nur, wenn die Datei seit dem letzte
 Lesen unverändert ist – sonst kommt `DatenWurdenGeaendert` und nichts wird
 überschrieben. Ohne den Parameter verhält sich alles wie in 0.1.0.
 
+## Neu in 0.5.0: verschlüsselte Sicherungen (`SvgSicherung`)
+
+Beschluss: Sicherungen aller Verbands-Apps werden echt verschlüsselt.
+`SvgSicherung` ist das gemeinsame Verfahren – einmal gebaut, für alle vier Apps:
+
+- Schlüssel aus dem Passwort: PBKDF2-HMAC-SHA256, zufälliges Salz,
+  200.000 Durchläufe (Zahl steht in der Datei und kann später steigen)
+- Inhalt gzip-komprimiert, verschlüsselt mit AES-256-GCM (mit Prüfsumme:
+  falsches Passwort oder veränderte Datei werden erkannt)
+- Datei = JSON mit lesbarem Kopf (`format: svg-sicherung`, App, Datum);
+  das Passwort wird nirgends gespeichert
+
+```dart
+final datei = await SvgSicherung.verschluesseln(utf8.encode(json), passwort,
+    app: 'Kassenbuch');
+final inhalt = await SvgSicherung.entschluesseln(datei, passwort);
+```
+
+Die bisherigen Sicherungen mit XOR-Verfahren sind **keine** echte
+Verschlüsselung; die Apps lesen sie weiter ein, schreiben aber nur noch das
+neue Format.
+
 ## Die eine Regel für alle Apps
 
 **Neu lesen – Änderung einfügen – schreiben.** Eine App schreibt nie ihren ganzen
