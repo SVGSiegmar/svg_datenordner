@@ -367,4 +367,59 @@ void main() {
           throwsArgumentError);
     });
   });
+
+  group('Vereinskennung (0.5.0)', () {
+    late Directory vtmp;
+    late Datenordner o;
+    setUp(() async {
+      vtmp = await Directory.systemTemp.createTemp('svg_verein_test');
+      o = Datenordner(vtmp.path);
+    });
+    tearDown(() async {
+      if (await vtmp.exists()) await vtmp.delete(recursive: true);
+    });
+
+    test('leerer Ordner ist frei', () async {
+      final e = await VereinsPruefung.pruefen(o, eigenerVereinsname: 'KGV Sonnenschein e. V.');
+      expect(e.status, VereinsStatus.ordnerLeer);
+      expect(e.darfWeiter, isTrue);
+    });
+
+    test('anlegen überschreibt nie, Kennung entscheidet', () async {
+      final a = await VereinsPruefung.anlegen(o, vereinsname: 'KGV Sonnenschein e. V.', app: 'Test');
+      final b = await VereinsPruefung.anlegen(o, vereinsname: 'Ganz anderer Verein');
+      expect(b.kennung, a.kennung);
+      expect(b.name, 'KGV Sonnenschein e. V.');
+      expect((await VereinsPruefung.pruefen(o, eigenerVereinsname: 'egal', eigeneKennung: a.kennung)).status,
+          VereinsStatus.gleicherVerein);
+      expect((await VereinsPruefung.pruefen(o, eigenerVereinsname: 'KGV Sonnenschein e. V.', eigeneKennung: '0011223344556677')).status,
+          VereinsStatus.andererVerein);
+    });
+
+    test('Name ohne Kennung: Schreibweise egal, anderer Verein wird erkannt', () async {
+      await VereinsPruefung.anlegen(o, vereinsname: 'Kleingartenverein Musteranlage e. V.');
+      expect((await VereinsPruefung.pruefen(o, eigenerVereinsname: 'kleingartenverein  musteranlage e.V.')).status,
+          VereinsStatus.gleicherVerein);
+      final e = await VereinsPruefung.pruefen(o, eigenerVereinsname: 'KGV Sonnenschein e. V.');
+      expect(e.status, VereinsStatus.andererVerein);
+      expect(e.darfWeiter, isFalse);
+      expect(e.text, contains('Musteranlage'));
+    });
+
+    test('alte Ordner ohne verein.json: Name aus app_daten.json', () async {
+      await File(o.datenDatei.path).create(recursive: true);
+      await o.datenDatei.writeAsString(jsonEncode({'stammdaten': {'vereinsname': 'KGV Am Teich e. V.'}}));
+      expect((await VereinsPruefung.pruefen(o, eigenerVereinsname: 'KGV Am Teich')).status,
+          VereinsStatus.gleicherVerein);
+      expect((await VereinsPruefung.pruefen(o, eigenerVereinsname: 'KGV Musteranlage')).status,
+          VereinsStatus.andererVerein);
+    });
+
+    test('Daten ohne erkennbaren Namen: unklar', () async {
+      await File(o.kassenbuchDatei.path).create(recursive: true);
+      await o.kassenbuchDatei.writeAsString('{}');
+      expect((await VereinsPruefung.pruefen(o, eigenerVereinsname: 'KGV Am Teich')).status,
+          VereinsStatus.unklar);
+    });
+  });
 }

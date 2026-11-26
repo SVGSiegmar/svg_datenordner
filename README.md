@@ -202,6 +202,29 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
 
+## 0.5.0 (26.11.2026): Vereinskennung
+
+Schützt davor, Daten zweier Vereine oder Test- und Echtdaten (Musteranlage) zu mischen.
+
+- `daten/verein.json` mit Vereinsname, fester Kennung, Datum und App. Wird einmal angelegt und nie überschrieben.
+- `VereinsPruefung.pruefen(ordner, eigenerVereinsname: …, eigeneKennung: …)` liefert `ordnerLeer`, `gleicherVerein`, `andererVerein` oder `unklar`, dazu `darfWeiter` und einen fertigen Satz `text` für die Meldung.
+- Ordner ohne `verein.json` (vor 0.5.0): Der Vereinsname wird aus `app_daten.json` gelesen und verglichen (ohne Groß-/Kleinschreibung, Satzzeichen und „e. V.“).
+- `VereinsPruefung.anlegen(ordner, vereinsname: …, app: …)` legt die Kennung an, falls sie fehlt.
+
+Einbau in jeder App beim „Ordner auswählen“, **bevor** etwas geladen, zusammengeführt oder geschrieben wird:
+
+```dart
+final ordner = Datenordner(pfad);
+final pruefung = await VereinsPruefung.pruefen(ordner,
+    eigenerVereinsname: vereinsname, eigeneKennung: gemerkteKennung);
+if (pruefung.status == VereinsStatus.andererVerein) { meldung(pruefung.text); return; }
+if (pruefung.status == VereinsStatus.unklar && !await rueckfrage(pruefung.text)) return;
+final kennung = await VereinsPruefung.anlegen(ordner, vereinsname: vereinsname, app: 'Kleingartenverwaltung');
+gemerkteKennung = kennung.kennung; // je Gerät in den Einstellungen merken
+```
+
+Eine App ohne eigenen Vereinsnamen (neue Installation) übernimmt Name und Kennung aus dem Ordner.
+
 ## 0.4.0 (22.11.2026)
 
 - `OrdnerUmzug(alt, neu)`: nimmt beim Wechsel des Datenordners den Inhalt des

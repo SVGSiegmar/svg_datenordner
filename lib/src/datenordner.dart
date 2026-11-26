@@ -68,6 +68,12 @@ class Datenordner {
 
   File get datenDatei => File(pfad(['daten', datenDateiName]));
 
+  /// 0.5.0: Vereinskennung des Ordners (`daten/verein.json`), siehe
+  /// [VereinsPruefung]. Schützt davor, Daten zweier Vereine oder Test- und
+  /// Echtdaten zu mischen.
+  static const String vereinDateiName = 'verein.json';
+  File get vereinDatei => File(pfad(['daten', vereinDateiName]));
+
   /// Eigene Datendatei des Kassenbuchs (ab 0.2.0). Liegt neben
   /// app_daten.json, damit Buchungen und Änderungsprotokoll die gemeinsame
   /// Datei der anderen Apps nicht aufblähen.
