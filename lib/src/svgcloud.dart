@@ -146,6 +146,17 @@ class SvgCloudVerbindung {
   final Duration zeitlimit;
   final HttpClient Function() _clientFabrik;
 
+  /// Vereinsordner-API (seit 27.11.2026 auf dem Server): Dateien werden
+  /// über ihren Pfad angesprochen.
+  static const String apiDateiliste = '/api/v2/club-files/files';
+  static const String apiDatei = '/api/v2/club-files/file';
+
+  /// Wie der Inhalt beim Speichern übertragen wird. Standard: multipart mit
+  /// den Feldern `path`, `expected_version` und `file`; `path` und
+  /// `expected_version` stehen zusätzlich in der Adresse. [SvgCloudHochladeArt.roh]
+  /// schickt nur die Bytes (Angaben dann nur in der Adresse).
+  SvgCloudHochladeArt hochladeArt = SvgCloudHochladeArt.multipart;
+
   /// Größte Datei, die der Server annimmt.
   static const int hoechstGroesse = 10 * 1024 * 1024;
 
@@ -201,14 +212,15 @@ class SvgCloudVerbindung {
   /// [SvgCloudNichtGekoppelt]; liefert die Antwort des Servers (z. B. Verein).
   Future<Object?> pruefen() => _json('POST', '/api/v1/connections/ping');
 
-  /// Legt den gemeinsamen Vereinsordner auf dem Server an, falls nötig.
+  /// Prüft, ob der gemeinsame Vereinsordner erreichbar ist. Der Server
+  /// legt ihn selbst an; es wird nur die Dateiliste abgerufen.
   Future<void> ordnerEinrichten() async {
-    await _json('POST', '/api/v1/shared-folder/init');
+    await dateiliste();
   }
 
   /// Alle Dateien des gemeinsamen Vereinsbereichs.
   Future<List<CloudDatei>> dateiliste() async {
-    final antwort = await _json('GET', '/api/v1/shared-folder/files');
+    final antwort = await _json('GET', apiDateiliste);
     final liste = antwort is List
         ? antwort
         : (antwort is Map ? (antwort['files'] ?? antwort['data'] ?? antwort['items']) : null);
@@ -225,10 +237,30 @@ class SvgCloudVerbindung {
     return null;
   }
 
-  /// Lädt den Inhalt einer Datei.
-  Future<List<int>> herunterladen(CloudDatei datei) async {
-    final antwort = await _anfrage('GET', '/api/v1/shared-folder/files/${Uri.encodeComponent(datei.id)}');
-    return antwort.bytes;
+  /// Lädt den Inhalt einer Datei (über ihren Pfad).
+  Future<List<int>> herunterladen(CloudDatei datei) => herunterladenPfad(datei.pfad);
+
+  /// Lädt den Inhalt der Datei unter [pfad].
+  Future<List<int>> herunterladenPfad(String pfad) async {
+    final antwort = await _anfrage('GET', apiDatei, abfrage: {'path': pfadNormal(pfad)});
+    return _inhaltAusAntwort(antwort);
+  }
+
+  /// Der Server kann den Inhalt roh oder als JSON-Hülle liefern
+  /// (`content_base64` bzw. `content` + `encoding: base64`).
+  static List<int> _inhaltAusAntwort(_Antwort a) {
+    if (!a.istJson) return a.bytes;
+    final j = a.json;
+    if (j is Map && (j.containsKey('content_base64') ||
+        (j.containsKey('content') && (j.containsKey('path') || j.containsKey('encoding'))))) {
+      final b64 = j['content_base64'];
+      if (b64 is String) return base64Decode(b64);
+      final c = j['content'];
+      if (c is String) {
+        return '${j['encoding']}'.toLowerCase() == 'base64' ? base64Decode(c) : utf8.encode(c);
+      }
+    }
+    return a.bytes;
   }
 
   /// Lädt eine Datei hoch. [erwarteteVersion] = 0 für eine neue Datei,
@@ -238,6 +270,7 @@ class SvgCloudVerbindung {
     String pfad,
     List<int> inhalt, {
     required int erwarteteVersion,
+    /// Ohne Bedeutung seit der Vereinsordner-API (Pfad genügt); bleibt für alte Aufrufe.
     String? dateiId,
   }) async {
     final p = pfadNormal(pfad);
@@ -249,31 +282,41 @@ class SvgCloudVerbindung {
     if (inhalt.length > hoechstGroesse) {
       throw SvgCloudFehler('„$name“ ist größer als 10 MB und kann nicht in die SVGCloud geladen werden.');
     }
-    final grenze = 'svg${Random().nextInt(1 << 32)}${DateTime.now().microsecondsSinceEpoch}';
-    final b = BytesBuilder(copy: false);
-    void feld(String n, String wert) {
-      b.add(utf8.encode('--$grenze\r\nContent-Disposition: form-data; name="$n"\r\n\r\n$wert\r\n'));
-    }
+    final abfrage = {'path': p, 'expected_version': '$erwarteteVersion'};
+    final _Antwort antwort;
+    if (hochladeArt == SvgCloudHochladeArt.roh) {
+      antwort = await _anfrage('PUT', apiDatei,
+          abfrage: abfrage, body: inhalt, contentType: 'application/octet-stream', konfliktPfad: p);
+    } else {
+      final grenze = 'svg${Random().nextInt(1 << 32)}${DateTime.now().microsecondsSinceEpoch}';
+      final b = BytesBuilder(copy: false);
+      void feld(String n, String wert) {
+        b.add(utf8.encode('--$grenze\r\nContent-Disposition: form-data; name="$n"\r\n\r\n$wert\r\n'));
+      }
 
-    feld('expected_version', '$erwarteteVersion');
-    feld('path', p);
-    b.add(utf8.encode('--$grenze\r\nContent-Disposition: form-data; name="file"; '
-        'filename="${name.replaceAll('"', '_')}"\r\n'
-        'Content-Type: application/octet-stream\r\n\r\n'));
-    b.add(inhalt);
-    b.add(utf8.encode('\r\n--$grenze--\r\n'));
-    final id = Uri.encodeComponent(dateiId ?? p);
-    final antwort = await _anfrage(
-      'PUT',
-      '/api/v1/shared-folder/files/$id',
-      body: b.takeBytes(),
-      contentType: 'multipart/form-data; boundary=$grenze',
-      konfliktPfad: p,
-    );
+      feld('expected_version', '$erwarteteVersion');
+      feld('path', p);
+      b.add(utf8.encode('--$grenze\r\nContent-Disposition: form-data; name="file"; '
+          'filename="${name.replaceAll('"', '_')}"\r\n'
+          'Content-Type: application/octet-stream\r\n\r\n'));
+      b.add(inhalt);
+      b.add(utf8.encode('\r\n--$grenze--\r\n'));
+      antwort = await _anfrage('PUT', apiDatei,
+          abfrage: abfrage,
+          body: b.takeBytes(),
+          contentType: 'multipart/form-data; boundary=$grenze',
+          konfliktPfad: p);
+    }
     final roh = antwort.json;
-    final datei = CloudDatei.ausJson(roh is Map && roh['file'] is Map ? roh['file'] : roh);
-    return datei ??
-        CloudDatei(id: dateiId ?? p, pfad: p, version: erwarteteVersion + 1, groesse: inhalt.length);
+    final innen = roh is Map && roh['file'] is Map
+        ? roh['file']
+        : (roh is Map && roh['data'] is Map ? roh['data'] : roh);
+    final datei = CloudDatei.ausJson(innen);
+    if (datei != null && datei.version > 0) return datei;
+    final v = innen is Map
+        ? int.tryParse('${innen['version'] ?? innen['current_version'] ?? innen['new_version'] ?? ''}')
+        : null;
+    return CloudDatei(id: p, pfad: p, version: v ?? erwarteteVersion + 1, groesse: inhalt.length);
   }
 
   // ------------------------------------------------------------- intern
@@ -294,6 +337,7 @@ class SvgCloudVerbindung {
     String? contentType,
     bool mitToken = true,
     String? konfliktPfad,
+    Map<String, String>? abfrage,
   }) async {
     String? token;
     if (mitToken) {
@@ -303,7 +347,7 @@ class SvgCloudVerbindung {
     final client = _clientFabrik();
     client.connectionTimeout = zeitlimit;
     try {
-      final req = await client.openUrl(methode, server.resolve(pfad)).timeout(zeitlimit);
+      final req = await client.openUrl(methode, server.resolveUri(Uri(path: pfad, queryParameters: abfrage))).timeout(zeitlimit);
       req.headers.set(HttpHeaders.acceptHeader, 'application/json');
       if (token != null) req.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
       if (contentType != null) req.headers.set(HttpHeaders.contentTypeHeader, contentType);
@@ -316,7 +360,8 @@ class SvgCloudVerbindung {
       await for (final teil in res.timeout(zeitlimit)) {
         bytes.addAll(teil);
       }
-      final antwort = _Antwort(res.statusCode, bytes);
+      final antwort = _Antwort(res.statusCode, bytes,
+          istJson: res.headers.contentType?.mimeType == 'application/json');
       if (res.statusCode >= 200 && res.statusCode < 300) return antwort;
       if (res.statusCode == 401 || res.statusCode == 403) {
         if (!mitToken) {
@@ -326,7 +371,11 @@ class SvgCloudVerbindung {
       }
       if (res.statusCode == 409 || res.statusCode == 412) {
         final j = antwort.json;
-        final v = j is Map ? int.tryParse('${j['current_version'] ?? j['version'] ?? ''}') : null;
+        int? v;
+        if (j is Map) {
+          final innen = j['file'] is Map ? j['file'] as Map : (j['data'] is Map ? j['data'] as Map : const {});
+          v = int.tryParse('${j['current_version'] ?? j['version'] ?? innen['current_version'] ?? innen['version'] ?? ''}');
+        }
         throw SvgCloudVersionKonflikt(konfliktPfad ?? pfad, v);
       }
       if (res.statusCode == 413) {
@@ -351,10 +400,14 @@ class SvgCloudVerbindung {
   }
 }
 
+/// Übertragungsart beim Speichern, siehe [SvgCloudVerbindung.hochladeArt].
+enum SvgCloudHochladeArt { multipart, roh }
+
 class _Antwort {
-  _Antwort(this.status, this.bytes);
+  _Antwort(this.status, this.bytes, {this.istJson = false});
   final int status;
   final List<int> bytes;
+  final bool istJson;
   Object? get json {
     if (bytes.isEmpty) return null;
     try {

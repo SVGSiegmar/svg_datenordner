@@ -10,6 +10,7 @@ class ErsatzServer {
   final dateien = <String, Map<String, Object>>{}; // pfad -> {version, bytes}
   String token = 'geraet-123';
   bool aus = false;
+  bool alsHuelle = false;
 
   Uri get adresse => Uri.parse('http://${server.address.host}:${server.port}');
 
@@ -39,21 +40,23 @@ class ErsatzServer {
       return json(401, {'message': 'nicht gekoppelt'});
     }
     if (pfad == '/api/v1/connections/ping') return json(200, {'ok': true});
-    if (pfad == '/api/v1/shared-folder/init') return json(200, {'ok': true});
-    if (pfad == '/api/v1/shared-folder/files' && req.method == 'GET') {
+    if (pfad == '/api/v2/club-files/files' && req.method == 'GET') {
       return json(200, {
         'files': [
           for (final e in dateien.entries)
-            {'file_id': e.key, 'path': e.key, 'version': e.value['version'], 'size': (e.value['bytes'] as List).length}
+            {'path': e.key, 'version': e.value['version'], 'size': (e.value['bytes'] as List).length}
         ]
       });
     }
-    const vorsatz = '/api/v1/shared-folder/files/';
-    if (pfad.startsWith(vorsatz)) {
-      final id = Uri.decodeComponent(pfad.substring(vorsatz.length));
+    if (pfad == '/api/v2/club-files/file') {
+      final dateiPfad = req.uri.queryParameters['path'] ?? '';
       if (req.method == 'GET') {
-        final d = dateien[id];
+        final d = dateien[dateiPfad];
         if (d == null) return json(404, {'message': 'fehlt'});
+        if (alsHuelle) {
+          return json(200, {'path': dateiPfad, 'version': d['version'], 'content_base64': base64Encode(d['bytes'] as List<int>)});
+        }
+        res.headers.contentType = ContentType.binary;
         res.add(d['bytes'] as List<int>);
         return res.close();
       }
@@ -61,14 +64,16 @@ class ErsatzServer {
         final roh = await req.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
         final text = latin1.decode(roh);
         final erwartet = int.parse(RegExp(r'name="expected_version"\r\n\r\n(\d+)').firstMatch(text)!.group(1)!);
+        if (req.uri.queryParameters['expected_version'] != '$erwartet') return json(400, {'message': 'expected_version fehlt in der Adresse'});
         final pfadFeld = RegExp(r'name="path"\r\n\r\n([^\r]*)').firstMatch(text)!.group(1)!;
+        if (pfadFeld != dateiPfad) return json(400, {'message': 'path passt nicht'});
         final start = text.indexOf('\r\n\r\n', text.indexOf('name="file"')) + 4;
         final ende = text.lastIndexOf('\r\n--');
         final inhalt = roh.sublist(start, ende);
         final aktuell = (dateien[pfadFeld]?['version'] as int?) ?? 0;
-        if (erwartet != aktuell) return json(409, {'current_version': aktuell});
+        if (erwartet != aktuell) return json(409, {'error': 'version_conflict', 'current_version': aktuell});
         dateien[pfadFeld] = {'version': aktuell + 1, 'bytes': inhalt};
-        return json(200, {'file': {'file_id': pfadFeld, 'path': pfadFeld, 'version': aktuell + 1}});
+        return json(200, {'path': pfadFeld, 'version': aktuell + 1});
       }
     }
     return json(404, {'message': 'unbekannt'});
@@ -161,5 +166,19 @@ void main() {
     expect(d2.pfad, 'dokumente/Begehung/Parzelle 12/Begehung_12 (2).pdf');
     await expectLater(v.hochladen('locks/schreibsperre.lock', [1], erwarteteVersion: 0),
         throwsA(isA<SvgCloudFehler>()));
+  });
+
+  test('Vereinsordner-API: JSON-Hülle beim Lesen, Konflikt mit current_version', () async {
+    s.alsHuelle = true;
+    final v = verbindung(SvgCloudTokenImSpeicher('geraet-123'));
+    final d1 = await v.hochladen('dokumente/Begehung/Parzelle 7/Protokoll.txt', utf8.encode('Hallo'), erwarteteVersion: 0);
+    expect(d1.version, 1);
+    expect(utf8.decode(await v.herunterladenPfad('dokumente/Begehung/Parzelle 7/Protokoll.txt')), 'Hallo');
+    try {
+      await v.hochladen('dokumente/Begehung/Parzelle 7/Protokoll.txt', utf8.encode('alt'), erwarteteVersion: 0);
+      fail('Konflikt erwartet');
+    } on SvgCloudVersionKonflikt catch (k) {
+      expect(k.aktuelleVersion, 1);
+    }
   });
 }

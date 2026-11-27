@@ -224,6 +224,24 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
 
+## 0.8.0 (27.11.2026): SVGCloud mit der Vereinsordner-API des Servers
+
+Angepasst an die Schnittstelle, die Andreas am 27.11.2026 auf svgcloud.de in Betrieb genommen hat. Für die Apps ändert sich nichts gegenüber 0.7.0 (gleiche Klassen und Aufrufe).
+
+| Aufruf | Anfrage | Antwort |
+| --- | --- | --- |
+| `POST /api/v1/connections/pair` | wie bisher (Gerät koppeln) | `{"device_token": "…"}` |
+| `POST /api/v1/connections/ping` | Bearer-Token | 200 |
+| `GET /api/v2/club-files/files` | Bearer-Token | Liste mit `path`, `version`, `size`, `updated_at` – ein gemeinsamer Ordner je Verein |
+| `GET /api/v2/club-files/file?path=…` | Bearer-Token | Dateiinhalt (roh oder JSON mit `content_base64`) |
+| `PUT /api/v2/club-files/file?path=…&expected_version=…` | multipart `path`, `expected_version`, `file` (umschaltbar auf rohe Bytes: `hochladeArt = SvgCloudHochladeArt.roh`) | 200 mit neuer `version`; **409** mit `current_version` bei Konflikt |
+
+- `herunterladenPfad(pfad)` neu; `herunterladen(datei)` nutzt jetzt den Pfad.
+- `ordnerEinrichten()` ruft nur noch die Dateiliste ab (der Server legt den Ordner selbst an).
+- `dateiId` bei `hochladen` wird nicht mehr gebraucht (bleibt erlaubt).
+- **Gerätetest:** `dart run tool/svgcloud_geraetetest.dart --schluessel <Verbindungsschlüssel>` koppelt, listet, lädt unter `_geraetetest/` hoch, liest zurück, ändert und prüft den Konflikt (409). Ohne `--schluessel` wird der gemerkte Test-Token genutzt; `--roh` testet die Übertragung ohne multipart; `--vergessen` löscht den Test-Token (`~/.svgcloud_geraetetest_token`).
+- Noch offen: Schreibrechte je Programm (mit Andreas abzustimmen).
+
 ## 0.7.0 (27.11.2026): SVGCloud als Speicherort
 
 Die Apps lesen und schreiben ihre Dateien **direkt** über die Datei-API der SVGCloud – kein Ordner-Abgleich, kein Hintergrund-Sync. Die Serverversion (`expected_version`) ersetzt die Sperrdatei. Läuft auf allen Systemen, auch iPad/iPhone.
@@ -234,7 +252,7 @@ Die Apps lesen und schreiben ihre Dateien **direkt** über die Datei-API der SVG
 - `cloudDokumentAblegen(verbindung, pfad, bytes)`: PDFs ablegen, nie überschreiben („(2)“, „(3)“ …).
 - Fehler mit fertigem Satz für die Meldung: `SvgCloudNichtGekoppelt`, `SvgCloudOffline`, `SvgCloudVersionKonflikt`, `SvgCloudFehler`.
 
-### Annahmen zur Schnittstelle (mit Andreas abzustimmen)
+### Annahmen zur Schnittstelle (Stand 0.7.0, abgelöst durch 0.8.0)
 
 | Aufruf | Anfrage | Antwort |
 | --- | --- | --- |
