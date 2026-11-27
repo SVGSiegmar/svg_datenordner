@@ -1,6 +1,6 @@
 // Geräte-Test der SVGCloud-Vereinsordner-API: Koppeln, Liste, Hochladen,
 // Herunterladen, Ändern und Konflikt. Legt nur Dateien unter
-// _geraetetest/ an; Vereinsdaten werden nicht angefasst.
+// austausch/_geraetetest/ an; Vereinsdaten werden nicht angefasst.
 //
 // Aufruf im Paketordner:
 //   dart run tool/svgcloud_geraetetest.dart --schluessel <Verbindungsschlüssel>
@@ -79,7 +79,7 @@ Future<void> main(List<String> args) async {
   }
 
   final stempel = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-  final pfad = '_geraetetest/test_$stempel.txt';
+  final pfad = 'austausch/_geraetetest/test_$stempel.txt';
   const text1 = 'SVGCloud Gerätetest – erste Fassung äöüß';
   const text2 = 'SVGCloud Gerätetest – zweite Fassung';
 
@@ -122,7 +122,7 @@ Future<void> main(List<String> args) async {
 
   print('');
   print(fehler == 0
-      ? 'Alles bestanden. Die Testdateien liegen unter _geraetetest/ und können auf dem Server gelöscht werden.'
+      ? 'Alles bestanden. Die Testdateien liegen unter austausch/_geraetetest/ und können auf dem Server gelöscht werden.'
       : '$fehler Schritt(e) fehlgeschlagen – bitte diese Ausgabe an Andreas bzw. den Datensync-Chat geben.');
   exit(fehler == 0 ? 0 : 2);
 }

@@ -41,6 +41,15 @@ class SvgCloudNichtGekoppelt extends SvgCloudFehler {
             status: 401);
 }
 
+/// Das Programm darf an dieser Stelle des Vereinsordners nicht schreiben
+/// (Schreibrechte je Programm auf dem Server, HTTP 403).
+class SvgCloudKeinSchreibrecht extends SvgCloudFehler {
+  SvgCloudKeinSchreibrecht(String pfad, [String? server])
+      : super('Dieses Programm darf „$pfad“ in der SVGCloud nicht speichern.'
+            '${server == null || server.isEmpty ? '' : ' ($server)'}',
+            status: 403);
+}
+
 /// Keine Verbindung zum Server (kein Internet, Server nicht erreichbar).
 class SvgCloudOffline extends SvgCloudFehler {
   SvgCloudOffline([String? technisch])
@@ -160,8 +169,16 @@ class SvgCloudVerbindung {
   /// Größte Datei, die der Server annimmt.
   static const int hoechstGroesse = 10 * 1024 * 1024;
 
-  /// Dateitypen, die der Server annimmt. PNG, JPG und MD sind beim
-  /// Stadtverband beantragt; bis dahin lehnt der Server sie ab.
+  /// ZIP-Sicherungen unter `backups/` dürfen bis 25 MB groß sein.
+  static const int hoechstGroesseSicherung = 25 * 1024 * 1024;
+
+  /// Erlaubte Größe für eine Datei an diesem Pfad.
+  static int hoechstGroesseFuer(String pfad) {
+    final p = pfadNormal(pfad).toLowerCase();
+    return p.startsWith('backups/') && p.endsWith('.zip') ? hoechstGroesseSicherung : hoechstGroesse;
+  }
+
+  /// Dateitypen, die der Server annimmt (PNG, JPG/JPEG und MD seit 27.11.2026 freigegeben).
   static const Set<String> erlaubteEndungen = {
     'json', 'csv', 'txt', 'pdf', 'xls', 'xlsx', 'zip', 'png', 'jpg', 'jpeg', 'md',
   };
@@ -279,8 +296,9 @@ class SvgCloudVerbindung {
     if (!erlaubteEndungen.contains(endung)) {
       throw SvgCloudFehler('Dateien vom Typ „.$endung“ nimmt die SVGCloud nicht an ($name).');
     }
-    if (inhalt.length > hoechstGroesse) {
-      throw SvgCloudFehler('„$name“ ist größer als 10 MB und kann nicht in die SVGCloud geladen werden.');
+    final grenze0 = hoechstGroesseFuer(p);
+    if (inhalt.length > grenze0) {
+      throw SvgCloudFehler('„$name“ ist größer als ${grenze0 ~/ (1024 * 1024)} MB und kann nicht in die SVGCloud geladen werden.');
     }
     final abfrage = {'path': p, 'expected_version': '$erwarteteVersion'};
     final _Antwort antwort;
@@ -363,6 +381,11 @@ class SvgCloudVerbindung {
       final antwort = _Antwort(res.statusCode, bytes,
           istJson: res.headers.contentType?.mimeType == 'application/json');
       if (res.statusCode >= 200 && res.statusCode < 300) return antwort;
+      if (res.statusCode == 403 && mitToken && konfliktPfad != null) {
+        final j = antwort.json;
+        throw SvgCloudKeinSchreibrecht(konfliktPfad,
+            j is Map ? (j['message'] ?? j['error'] ?? j['detail'])?.toString() : null);
+      }
       if (res.statusCode == 401 || res.statusCode == 403) {
         if (!mitToken) {
           throw SvgCloudFehler('Der Verbindungsschlüssel wurde nicht angenommen.', status: res.statusCode);
@@ -379,7 +402,7 @@ class SvgCloudVerbindung {
         throw SvgCloudVersionKonflikt(konfliktPfad ?? pfad, v);
       }
       if (res.statusCode == 413) {
-        throw SvgCloudFehler('Die Datei ist für die SVGCloud zu groß (höchstens 10 MB).', status: 413);
+        throw SvgCloudFehler('Die Datei ist für die SVGCloud zu groß (höchstens 10 MB, Sicherungen unter backups/ 25 MB).', status: 413);
       }
       final j = antwort.json;
       final text = j is Map ? (j['message'] ?? j['error'] ?? j['detail'])?.toString() : null;

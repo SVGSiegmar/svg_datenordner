@@ -239,8 +239,10 @@ Angepasst an die Schnittstelle, die Andreas am 27.11.2026 auf svgcloud.de in Bet
 - `herunterladenPfad(pfad)` neu; `herunterladen(datei)` nutzt jetzt den Pfad.
 - `ordnerEinrichten()` ruft nur noch die Dateiliste ab (der Server legt den Ordner selbst an).
 - `dateiId` bei `hochladen` wird nicht mehr gebraucht (bleibt erlaubt).
-- **Gerätetest:** `dart run tool/svgcloud_geraetetest.dart --schluessel <Verbindungsschlüssel>` koppelt, listet, lädt unter `_geraetetest/` hoch, liest zurück, ändert und prüft den Konflikt (409). Ohne `--schluessel` wird der gemerkte Test-Token genutzt; `--roh` testet die Übertragung ohne multipart; `--vergessen` löscht den Test-Token (`~/.svgcloud_geraetetest_token`).
-- Noch offen: Schreibrechte je Programm (mit Andreas abzustimmen).
+- **Gerätetest:** `dart run tool/svgcloud_geraetetest.dart --schluessel <Verbindungsschlüssel>` koppelt, listet, lädt unter `austausch/_geraetetest/` hoch, liest zurück, ändert und prüft den Konflikt (409). Ohne `--schluessel` wird der gemerkte Test-Token genutzt; `--roh` testet die Übertragung ohne multipart; `--vergessen` löscht den Test-Token (`~/.svgcloud_geraetetest_token`).
+- Schreibrechte je Programm prüft der Server; verweigert er (403), wirft `hochladen` `SvgCloudKeinSchreibrecht` mit fertigem Satz (401 bleibt „nicht gekoppelt“).
+- Dateitypen: json, csv, txt, pdf, xls, xlsx, zip, png, jpg/jpeg, md. Höchstens 10 MB, ZIP-Sicherungen unter `backups/` bis 25 MB (`hoechstGroesseFuer(pfad)`).
+- Testdateien des Gerätetests liegen unter `austausch/_geraetetest/` und werden auf dem Server administrativ entfernt.
 
 ## 0.7.0 (27.11.2026): SVGCloud als Speicherort
 
