@@ -224,6 +224,44 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
 
+## 0.7.0 (27.11.2026): SVGCloud als Speicherort
+
+Die Apps lesen und schreiben ihre Dateien **direkt** über die Datei-API der SVGCloud – kein Ordner-Abgleich, kein Hintergrund-Sync. Die Serverversion (`expected_version`) ersetzt die Sperrdatei. Läuft auf allen Systemen, auch iPad/iPhone.
+
+- `SvgCloudVerbindung(tokenSpeicher: …)`: `koppeln(verbindungsschluessel)`, `pruefen()`, `ordnerEinrichten()`, `dateiliste()`, `datei(pfad)`, `herunterladen(datei)`, `hochladen(pfad, bytes, erwarteteVersion: …)`, `entkoppeln()`.
+- `SvgCloudTokenSpeicher`: jede App setzt ihn mit dem sicheren Speicher des Systems um (z. B. `flutter_secure_storage`). Der Token steht nie in Vereinsdaten.
+- `CloudGemeinsameDaten(verbindung, pfad: 'daten/app_daten.json', zwischenspeicher: …)`: wie `GemeinsameDaten` – `lesen()`, `aendern(...)` mit `erwartetePruefsumme` (hier `v<Version>`), Konflikt → `DatenWurdenGeaendert`. Ohne Netz: `lesen()` liefert den zuletzt geladenen Stand (`offline == true`), `aendern()` merkt die Änderung als ausstehend und wirft `SvgCloudOffline`; `nachholen()` lädt sie später mit Versionsprüfung hoch, `ausstehendeFassung()` / `ausstehendVerwerfen()` für die bekannte Rückfrage.
+- `cloudDokumentAblegen(verbindung, pfad, bytes)`: PDFs ablegen, nie überschreiben („(2)“, „(3)“ …).
+- Fehler mit fertigem Satz für die Meldung: `SvgCloudNichtGekoppelt`, `SvgCloudOffline`, `SvgCloudVersionKonflikt`, `SvgCloudFehler`.
+
+### Annahmen zur Schnittstelle (mit Andreas abzustimmen)
+
+| Aufruf | Anfrage | Antwort |
+| --- | --- | --- |
+| `POST /api/v1/connections/pair` | JSON `connection_key`, `device_name`, `app`, `platform` | `{"device_token": "…"}` |
+| `POST /api/v1/connections/ping` | Bearer-Token | 200 |
+| `POST /api/v1/shared-folder/init` | Bearer-Token | 200 |
+| `GET /api/v1/shared-folder/files` | Bearer-Token | `{"files": [{"file_id", "path", "version", "size", "updated_at"}]}` – **ein gemeinsamer Bereich je Verein für alle vier Programme** |
+| `PUT /api/v1/shared-folder/files/{file_id}` | multipart: `expected_version`, `path`, `file`. Neue Datei: `{file_id}` = URL-kodierter Pfad, `expected_version=0` | 200 mit der Datei (neue Version); **409 mit `current_version` bei Konflikt** |
+| `GET /api/v1/shared-folder/files/{file_id}` | Bearer-Token | Dateiinhalt |
+
+401/403 = Gerät nicht gekoppelt, 413 = zu groß. Dateitypen: JSON, CSV, TXT, PDF, XLS, XLSX, ZIP, dazu beantragt PNG, JPG, MD. Höchstens 10 MB je Datei.
+
+### Einbau in einer App (Skizze)
+
+```dart
+final cloud = SvgCloudVerbindung(tokenSpeicher: MeinSichererTokenSpeicher());
+await cloud.koppeln(schluessel, app: 'Kleingartenverwaltung');   // einmalig
+await cloud.ordnerEinrichten();
+final daten = CloudGemeinsameDaten(cloud,
+    pfad: 'daten/app_daten.json', zwischenspeicher: appDatenbereich('svgcloud'));
+final stand = await daten.lesen();
+try {
+  await daten.aendern((d) { /* nur das Eigene ändern */ }, erwartetePruefsumme: stand?.pruefsumme);
+} on DatenWurdenGeaendert { /* Rückfrage: Neu laden / Meine Fassung */ }
+  on SvgCloudOffline catch (e) { /* e.meldung anzeigen, später nachholen() */ }
+```
+
 ## 0.6.0 (26.11.2026): Sicherung, Vereinskennung und Importregeln in einer Fassung
 
 Fasst die beiden Stände zusammen, die parallel als „0.5.0“ entstanden sind:

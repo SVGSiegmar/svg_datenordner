@@ -23,3 +23,5 @@ export 'src/schreibsperre.dart';
 export 'src/vereinskennung.dart';
 export 'src/import_regeln.dart';
 export 'src/sicherung.dart';
+export 'src/svgcloud.dart';
+export 'src/cloud_daten.dart';
