@@ -224,6 +224,16 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
 
+## 0.8.0 (27.11.2026): SVGCloud in den Apps einbauen
+
+Erst nach bestandenem Gerätetest als Tag `0.8.0` veröffentlichen (bis dahin Zweig `stand-0.8.0`).
+
+- **Dateitypen:** `erlaubteEndungen` = JSON, CSV, TXT, PDF, XLS, XLSX, ZIP. PNG, JPG und MD stehen in `beantragteEndungen` und werden bis zur Freigabe durch Andreas schon in der App abgelehnt. `SvgCloudVerbindung.dateiPruefen(pfad, groesse)` liefert den Satz für die Meldung (Typ, höchstens 10 MB).
+- **`CloudVereinsPruefung`**: `pruefen(verbindung, zwischenspeicher: …, eigenerVereinsname: …, eigeneKennung: …)` und `anlegen(...)` – wie `VereinsPruefung`, aber mit `daten/verein.json` in der Cloud. Ohne Kennung wird der Name aus `daten/app_daten.json` verglichen.
+- **`CloudUmzug.ausOrdner(quelle, verbindung, pfade)`**: Umzug Ordner → SVGCloud mit `erwarteteVersion: 0`. Vorhandene Dateien werden nicht überschrieben, sondern in `schonVorhanden` gemeldet; `text` liefert den Satz für die Meldung.
+- **`cloudDokumentPfad(kategorie, parzelle, dateiname)`**: `dokumente/<Kategorie>/Parzelle <Nr>/<Datei>` wie `Datenordner.dokumentOrdner`. `cloudDokumentAblegen` prüft Typ und Größe vorab.
+- Keine Schreibsperre-Datei bei der Cloud – die Versionsprüfung des Servers ersetzt sie.
+
 ## 0.7.0 (27.11.2026): SVGCloud als Speicherort
 
 Die Apps lesen und schreiben ihre Dateien **direkt** über die Datei-API der SVGCloud – kein Ordner-Abgleich, kein Hintergrund-Sync. Die Serverversion (`expected_version`) ersetzt die Sperrdatei. Läuft auf allen Systemen, auch iPad/iPhone.

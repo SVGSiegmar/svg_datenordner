@@ -208,6 +208,8 @@ Future<CloudDatei> cloudDokumentAblegen(
   List<int> inhalt,
 ) async {
   final p = SvgCloudVerbindung.pfadNormal(pfad);
+  final unpassend = SvgCloudVerbindung.dateiPruefen(p, inhalt.length);
+  if (unpassend != null) throw SvgCloudFehler(unpassend);
   final vorhanden = (await verbindung.dateiliste()).map((d) => d.pfad).toSet();
   final punkt = p.lastIndexOf('.');
   final stamm = punkt > p.lastIndexOf('/') ? p.substring(0, punkt) : p;

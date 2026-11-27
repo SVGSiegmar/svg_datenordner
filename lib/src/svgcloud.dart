@@ -149,11 +149,33 @@ class SvgCloudVerbindung {
   /// Größte Datei, die der Server annimmt.
   static const int hoechstGroesse = 10 * 1024 * 1024;
 
-  /// Dateitypen, die der Server annimmt. PNG, JPG und MD sind beim
-  /// Stadtverband beantragt; bis dahin lehnt der Server sie ab.
+  /// Dateitypen, die der Server annimmt.
   static const Set<String> erlaubteEndungen = {
-    'json', 'csv', 'txt', 'pdf', 'xls', 'xlsx', 'zip', 'png', 'jpg', 'jpeg', 'md',
+    'json', 'csv', 'txt', 'pdf', 'xls', 'xlsx', 'zip',
   };
+
+  /// Beantragt, aber noch nicht freigegeben (Freigabe durch Andreas). Bis
+  /// dahin lehnt schon die App sie mit einem verständlichen Satz ab.
+  static const Set<String> beantragteEndungen = {'png', 'jpg', 'jpeg', 'md'};
+
+  /// Prüft Dateityp und Größe, bevor etwas hochgeladen wird. Liefert einen
+  /// Satz für die Meldung oder null, wenn die Datei passt.
+  static String? dateiPruefen(String pfad, int groesse) {
+    final name = pfadNormal(pfad).split('/').last;
+    final endung = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    if (beantragteEndungen.contains(endung)) {
+      return 'Dateien vom Typ „.$endung“ sind für die SVGCloud beantragt, aber '
+          'noch nicht freigegeben ($name).';
+    }
+    if (!erlaubteEndungen.contains(endung)) {
+      return 'Dateien vom Typ „.$endung“ nimmt die SVGCloud nicht an ($name).';
+    }
+    if (groesse > hoechstGroesse) {
+      return '„$name“ ist größer als 10 MB und kann nicht in die SVGCloud '
+          'geladen werden.';
+    }
+    return null;
+  }
 
   /// Pfad mit „/“, ohne führenden oder doppelten Schrägstrich.
   static String pfadNormal(String pfad) => pfad
@@ -242,13 +264,8 @@ class SvgCloudVerbindung {
   }) async {
     final p = pfadNormal(pfad);
     final name = p.split('/').last;
-    final endung = name.contains('.') ? name.split('.').last.toLowerCase() : '';
-    if (!erlaubteEndungen.contains(endung)) {
-      throw SvgCloudFehler('Dateien vom Typ „.$endung“ nimmt die SVGCloud nicht an ($name).');
-    }
-    if (inhalt.length > hoechstGroesse) {
-      throw SvgCloudFehler('„$name“ ist größer als 10 MB und kann nicht in die SVGCloud geladen werden.');
-    }
+    final unpassend = dateiPruefen(p, inhalt.length);
+    if (unpassend != null) throw SvgCloudFehler(unpassend);
     final grenze = 'svg${Random().nextInt(1 << 32)}${DateTime.now().microsecondsSinceEpoch}';
     final b = BytesBuilder(copy: false);
     void feld(String n, String wert) {

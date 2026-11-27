@@ -162,4 +162,65 @@ void main() {
     await expectLater(v.hochladen('locks/schreibsperre.lock', [1], erwarteteVersion: 0),
         throwsA(isA<SvgCloudFehler>()));
   });
+
+  test('PNG ist beantragt, aber noch nicht erlaubt; zu große Dateien abgelehnt', () async {
+    expect(SvgCloudVerbindung.dateiPruefen('dokumente/a/bild.png', 10), contains('noch nicht freigegeben'));
+    expect(SvgCloudVerbindung.dateiPruefen('daten/x.json', SvgCloudVerbindung.hoechstGroesse + 1), contains('10 MB'));
+    expect(SvgCloudVerbindung.dateiPruefen('daten/x.json', 10), isNull);
+    final v = verbindung(SvgCloudTokenImSpeicher('geraet-123'));
+    await expectLater(cloudDokumentAblegen(v, 'dokumente/a/Parzelle 1/bild.jpg', [1]),
+        throwsA(isA<SvgCloudFehler>()));
+  });
+
+  test('Vereinsprüfung in der Cloud: leer, anlegen, gleicher und anderer Verein', () async {
+    final v = verbindung(SvgCloudTokenImSpeicher('geraet-123'));
+    final z = Directory('${tmp.path}/v');
+    var e = await CloudVereinsPruefung.pruefen(v, zwischenspeicher: z, eigenerVereinsname: 'KGV Muster e. V.');
+    expect(e.status, VereinsStatus.ordnerLeer);
+    final k = await CloudVereinsPruefung.anlegen(v, zwischenspeicher: z, vereinsname: 'KGV Muster e. V.', app: 'Test');
+    final k2 = await CloudVereinsPruefung.anlegen(v, zwischenspeicher: z, vereinsname: 'Anders', app: 'Test');
+    expect(k2.kennung, k.kennung);
+    e = await CloudVereinsPruefung.pruefen(v, zwischenspeicher: z, eigenerVereinsname: 'kgv muster');
+    expect(e.status, VereinsStatus.gleicherVerein);
+    e = await CloudVereinsPruefung.pruefen(v, zwischenspeicher: z, eigenerVereinsname: 'KGV Muster', eigeneKennung: 'andere');
+    expect(e.status, VereinsStatus.andererVerein);
+  });
+
+  test('Vereinsprüfung ohne Kennung: Name aus app_daten.json', () async {
+    final v = verbindung(SvgCloudTokenImSpeicher('geraet-123'));
+    s.dateien['daten/app_daten.json'] = {
+      'version': 1,
+      'bytes': utf8.encode(jsonEncode({'stammdaten': {'vereinsname': 'KGV Erfunden'}}))
+    };
+    final z = Directory('${tmp.path}/w');
+    expect((await CloudVereinsPruefung.pruefen(v, zwischenspeicher: z, eigenerVereinsname: 'KGV Erfunden e.V.')).status,
+        VereinsStatus.gleicherVerein);
+    expect((await CloudVereinsPruefung.pruefen(v, zwischenspeicher: z, eigenerVereinsname: 'KGV Anders')).status,
+        VereinsStatus.andererVerein);
+  });
+
+  test('Umzug Ordner → Cloud überschreibt nichts', () async {
+    final v = verbindung(SvgCloudTokenImSpeicher('geraet-123'));
+    final ordner = Datenordner('${tmp.path}/ordner');
+    await ordner.grundordnerAnlegen();
+    await ordner.kassenbuchDatei.writeAsString('{"a":1}');
+    await File(ordner.pfad(['austausch', 'kassenbuch_zahlungen.json'])).writeAsString('{"b":2}');
+    await File(ordner.pfad(['backups', 'kassenbuch', 'x.svgsicherung'])).create(recursive: true);
+    s.dateien['austausch/kassenbuch_zahlungen.json'] = {'version': 3, 'bytes': utf8.encode('{"fremd":1}')};
+    final r = await CloudUmzug.ausOrdner(ordner, v, [
+      'daten/kassenbuch.json',
+      'austausch/kassenbuch_zahlungen.json',
+      'backups/kassenbuch/x.svgsicherung',
+      'daten/fehlt.json',
+    ]);
+    expect(r.uebertragen, ['daten/kassenbuch.json']);
+    expect(r.schonVorhanden, ['austausch/kassenbuch_zahlungen.json']);
+    expect(r.uebersprungen.keys, ['backups/kassenbuch/x.svgsicherung']);
+    expect(utf8.decode(s.dateien['austausch/kassenbuch_zahlungen.json']!['bytes'] as List<int>), '{"fremd":1}');
+  });
+
+  test('Dokumentpfad wie im Datenordner', () {
+    expect(cloudDokumentPfad('Kassenbuch', '12A', 'Beleg 1.pdf'), 'dokumente/Kassenbuch/Parzelle 12A/Beleg 1.pdf');
+    expect(cloudDokumentPfad('Kassenbuch', '', 'x.pdf'), 'dokumente/Kassenbuch/Ohne Parzelle/x.pdf');
+  });
 }
