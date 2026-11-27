@@ -224,6 +224,19 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
 
+## 0.9.0 (28.11.2026): Gemeinsame Benutzer und Rechte
+
+Entscheidung 27.11.2026, gilt für Kassenbuch und Mitgliederverwaltung. Abwärtskompatibel: Wer `Benutzerverwaltung` nicht nutzt, merkt nichts.
+
+- **Datei:** `daten/benutzer.json` (`Datenordner.benutzerDatei`). Ohne Datenordner dieselbe Datei im Datenbereich der App (`Benutzerverwaltung(Datenordner(appBereich), app: …)`).
+- **Aufbau:** `{"format": "svg-benutzer", "anmeldungAn": false, "benutzer": [{"id", "benutzername", "email", "passwort", "admin", "aktiv", "rechte": {"kassenbuch": [...], "kleingartenverwaltung": [...]}, …}], "postausgang": {…}, "codes": [...]}`. Eine Person = ein Konto für alle Apps. Unbekannte Felder bleiben erhalten.
+- **Passwörter** nur als PBKDF2-SHA256 mit Salz (`pbkdf2-sha256$<Durchläufe>$<Salz>$<Prüfwert>`, 100 000 Durchläufe, im Hintergrund-Isolate) – derselbe Aufbau wie bisher im Kassenbuch, alte Werte werden übernommen. Alte SHA-256-Werte ohne Salz werden erkannt und bei der nächsten Anmeldung umgestellt.
+- **`Benutzerverwaltung`** (immer unter der Schreibsperre): `lesen()`, `aendern(fn)`, `anlegen(...)`, `bearbeiten(id, ...)`, `loeschen(id)`, `passwortSetzen(id, neu)`, `anmelden(nameOderEmail, passwort)`, `anmeldungSchalten(an)`, `postausgangSetzen(p)`.
+- **Rechte:** `benutzer.darf(app, recht)` – Administratoren dürfen alles, deaktivierte Konten nichts. Die Namen der Rechte legt jede App selbst fest. App-Schlüssel: `Benutzerverwaltung.appKassenbuch`, `appKleingartenverwaltung`.
+- **Regeln:** Das erste Konto wird Administrator. Die Anmeldung lässt sich erst einschalten, wenn ein aktiver Administrator eine E-Mail-Adresse hat (`liste.anmeldungMoeglich`). Der letzte Administrator kann nicht gelöscht, deaktiviert oder herabgestuft werden. Fehler kommen als `BenutzerFehler` mit fertigem Satz (`meldung`).
+- **Passwort vergessen:** Ein Administrator setzt das Passwort zurück (`passwortSetzen`), oder `codeSenden(nameOderEmail, smtpPasswort: …)` schickt einen 6-stelligen Code (15 Minuten gültig, 5 Versuche) über den Postausgang des Vereins; `codeEinloesen(nameOderEmail, code, neu)`. Die SMTP-Angaben stehen in der Datei, das SMTP-Passwort nur im sicheren Speicher des Geräts (Sache der App).
+- Neue Abhängigkeit: `mailer` (MIT).
+
 ## 0.7.0 (27.11.2026): SVGCloud als Speicherort
 
 Die Apps lesen und schreiben ihre Dateien **direkt** über die Datei-API der SVGCloud – kein Ordner-Abgleich, kein Hintergrund-Sync. Die Serverversion (`expected_version`) ersetzt die Sperrdatei. Läuft auf allen Systemen, auch iPad/iPhone.

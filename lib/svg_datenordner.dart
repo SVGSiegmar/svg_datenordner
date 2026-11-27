@@ -7,6 +7,7 @@
 ///   daten/app_daten.json       Verein, Parzellen, Mitglieder
 ///   daten/kassenbuch.json      Kassenbuch (ab 0.2.0)
 ///   daten/verein.json          Vereinskennung (ab 0.5.0)
+///   daten/benutzer.json        Benutzer und Rechte aller Apps (ab 0.9.0)
 ///   locks/                     aktive_sitzungen.json, schreibsperre.json
 ///   dokumente/<Kategorie>/Parzelle <Nr>/ (ohne Datumsordner)
 ///                              z. B. Begehung (Gartenbegehung),
@@ -25,3 +26,4 @@ export 'src/import_regeln.dart';
 export 'src/sicherung.dart';
 export 'src/svgcloud.dart';
 export 'src/cloud_daten.dart';
+export 'src/benutzer.dart';

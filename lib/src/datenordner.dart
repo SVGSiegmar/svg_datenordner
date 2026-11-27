@@ -81,6 +81,11 @@ class Datenordner {
 
   File get kassenbuchDatei => File(pfad(['daten', kassenbuchDateiName]));
 
+  /// 0.9.0: gemeinsame Benutzerkonten aller Apps (`daten/benutzer.json`).
+  static const String benutzerDateiName = 'benutzer.json';
+
+  File get benutzerDatei => File(pfad(['daten', benutzerDateiName]));
+
   /// Eigene Datendatei der Gartenvergabe (Vergaben, Löschvermerke).
   static const String gartenvergabeDateiName = 'gartenvergabe.json';
 
