@@ -74,6 +74,11 @@ class Datenordner {
   static const String vereinDateiName = 'verein.json';
   File get vereinDatei => File(pfad(['daten', vereinDateiName]));
 
+  /// 0.9.0: gemeinsame Benutzer aller Apps (`daten/benutzer.json`), siehe
+  /// [SvgBenutzerverwaltung].
+  static const String benutzerDateiName = 'benutzer.json';
+  File get benutzerDatei => File(pfad(['daten', benutzerDateiName]));
+
   /// Eigene Datendatei des Kassenbuchs (ab 0.2.0). Liegt neben
   /// app_daten.json, damit Buchungen und Änderungsprotokoll die gemeinsame
   /// Datei der anderen Apps nicht aufblähen.

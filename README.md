@@ -224,6 +224,32 @@ und zeigt nach spätestens 30 Sekunden „Jetzt neu laden“. Zwei Dinge fehlen:
 - `gartenvergabeDatei` (`daten/gartenvergabe.json`).
 - Abwärtskompatibel zu 0.1.0 und 0.2.0.
 
+## 0.9.0 (28.11.2026): gemeinsame Benutzer und Rechte (`daten/benutzer.json`)
+
+Festlegung vom 27.11.2026 für Kassenbuch und Kleingartenverwaltung: Die Apps starten ohne Anmeldung (nach der Aktivierung mit der Seriennummer). Die Benutzerverwaltung in den Einstellungen ist freiwillig; die Anmeldung lässt sich erst einschalten, wenn mindestens ein Administrator mit E-Mail-Adresse angelegt ist. Eine Person = ein Konto für beide Apps.
+
+- **Datei:** `daten/benutzer.json` im Datenordner (`Datenordner.benutzerDatei`), ohne Datenordner dieselbe Datei im Datenbereich der App (`SvgBenutzerDatei.lokal`), in der SVGCloud über `SvgBenutzerCloud`. Geschrieben wird unter der gemeinsamen Schreibsperre (bzw. mit der Versionsprüfung der SVGCloud); unbekannte Felder bleiben erhalten.
+- **Passwörter** nur als PBKDF2-SHA256 mit Salz, 100 000 Durchläufe (`pbkdf2-sha256$n$salz$wert`, dasselbe Format wie bisher im Kassenbuch). Alte Prüfwerte (SHA-256 ohne Salz) werden erkannt und bei der nächsten Anmeldung umgestellt. Berechnet wird in einem eigenen Isolate.
+- **Rechte je App** im Konto: `"rechte": {"kassenbuch": [...], "kleingartenverwaltung": [...]}`; Kataloge in `SvgRechte` (Kassenbuch: Buchungen ansehen/erfassen/ändern und stornieren, Kontoauszug einlesen, Forderungen übernehmen, Zahlungen zurückmelden, Jahresabschluss, Einstellungen; Kleingartenverwaltung: je Bereich `.sehen`/`.aendern`). Administratoren dürfen alles, die Benutzerverwaltung nur sie.
+- **Regeln** (`SvgBenutzerStand.pruefen`, bei jeder Änderung): Name und E-Mail eindeutig, der letzte aktive Administrator kann nicht gelöscht, gesperrt oder herabgestuft werden, eingeschaltete Anmeldung braucht einen Administrator mit E-Mail.
+- **Passwort vergessen:** Ein Administrator setzt es zurück (`passwortSetzen`), oder `codeErzeugen` legt einen sechsstelligen Code (15 Minuten gültig, 5 Versuche, nur als Prüfwert gespeichert) an, den die App über den Postausgang des Vereins verschickt; `mitCodeZuruecksetzen` setzt das neue Passwort. Das Wiederherstellungs-PDF entfällt.
+- **Übernahme** der bisherigen Benutzer der Kleingartenverwaltung: `ausKleingartenverwaltungUebernehmen` (nur solange `benutzer.json` leer ist).
+
+```dart
+final verwaltung = SvgBenutzerverwaltung(
+  SvgBenutzerDatei.imOrdner(Datenordner(pfad), app: 'Kassenbuch', benutzer: meinName),
+  app: SvgRechte.kassenbuch,
+);
+final stand = await verwaltung.lesen();
+if (stand.anmeldungAktiv) {
+  final a = await verwaltung.anmelden(eingabeName, eingabePasswort);
+  if (!a.erfolgreich) zeigeMeldung(a.meldung);
+}
+final darfRueckmelden = verwaltung.darf(angemeldet, 'zahlungen_zurueckmelden', anmeldungAktiv: stand.anmeldungAktiv);
+```
+
+Tests: `dart test test/benutzer_test.dart`.
+
 ## 0.8.0 (27.11.2026): SVGCloud mit der Vereinsordner-API des Servers
 
 Angepasst an die Schnittstelle, die Andreas am 27.11.2026 auf svgcloud.de in Betrieb genommen hat. Für die Apps ändert sich nichts gegenüber 0.7.0 (gleiche Klassen und Aufrufe).
